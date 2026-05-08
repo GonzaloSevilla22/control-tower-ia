@@ -61,7 +61,7 @@ class OutlookConnector:
         except Exception:
             pass
 
-        logger.info("Scanned %d logistics emails (last %d days)", len(emails), days)
+        logger.info("Scanned %d emails (last %d days)", len(emails), days)
         return emails
 
     def _scan_folder(self, folder, cutoff: datetime, result: list[dict]) -> None:
@@ -70,11 +70,12 @@ class OutlookConnector:
             messages.Sort("[ReceivedTime]", True)    # newest first
             for msg in messages:
                 try:
-                    received = _com_date(msg.ReceivedTime)
+                    # Sent items may have ReceivedTime = None; fall back to SentOn
+                    received = _com_date(msg.ReceivedTime) or _com_date(getattr(msg, 'SentOn', None))
                     if received and received < cutoff:
                         break       # items are sorted desc; stop when too old
                     data = self._extract_message(msg)
-                    if data and self._is_logistics_email(data["subject"], data["body"]):
+                    if data:
                         result.append(data)
                 except Exception as exc:
                     logger.debug("Skip message: %s", exc)
@@ -86,7 +87,7 @@ class OutlookConnector:
             entry_id    = str(msg.EntryID or "")
             subject     = str(msg.Subject or "")
             sender      = str(getattr(msg, "SenderEmailAddress", "") or msg.SenderName or "")
-            received    = _com_date(msg.ReceivedTime)
+            received    = _com_date(msg.ReceivedTime) or _com_date(getattr(msg, 'SentOn', None))
             body        = str(msg.Body or "")[:8000]    # cap to 8 KB
 
             attachments = []

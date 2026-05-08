@@ -8,13 +8,15 @@ from typing import Any
 # ── Reference patterns ────────────────────────────────────
 
 _SO_PATTERNS = [
+    r'\bService\s+Order[-:\s#]+(\d{4,12})\b',
     r'\bSO[-\s#]?(\d{5,12})\b',
     r'\bS\.O\.[-:\s]+([A-Z0-9\-]{4,15})\b',
-    r'\bService\s+Order[-:\s#]+([A-Z0-9\-]{4,15})\b',
     r'\bSOA?[-\s]?(\d{5,12})\b',
 ]
 
 _BL_PATTERNS = [
+    # STOR-format HBL (e.g. STOR0158537)
+    r'\b(STOR\d{5,12})\b',
     r'\bB/?L[-:\s#]+([A-Z0-9]{6,20})\b',
     r'\bBL[-\s#]?([A-Z0-9]{6,20})\b',
     r'\bBill\s+of\s+Lading[-:\s]+([A-Z0-9]{6,20})\b',
@@ -30,14 +32,20 @@ _AWB_PATTERNS = [
 ]
 
 _DELIVERY_PATTERNS = [
+    # Primary DN match: "DN 16107309"
     r'\bDN[-\s#]?(\d{6,12})\b',
+    # Second DN after "and/y": "DN 16107309 and 16113629"
+    r'\bDN[-\s#]?\d{6,12}\s+(?:and|y)\s+(\d{6,12})\b',
     r'\bDelivery\s+(?:Number|No\.?|#)[-:\s]+(\d{5,12})\b',
     r'\bDEL[-\s#]?(\d{5,12})\b',
 ]
 
 _OP_PATTERNS = [
+    # Alphanumeric OP like "DP2211" (letters then digits)
+    r'\bOP[-\s#]?([A-Z]{1,4}\d{2,10})\b',
+    # Pure numeric OP
     r'\bOP[-\s#]?(\d{4,12})\b',
-    r'\bO\.P\.[-:\s]+(\d{4,12})\b',
+    r'\bO\.P\.[-:\s]+([A-Z0-9\-]{3,15})\b',
     r'\bOrden\s+de\s+[Pp]edido[-:\s]+([A-Z0-9\-]{3,15})\b',
 ]
 

@@ -127,18 +127,20 @@ def _process_email(raw: dict, db: Session) -> None:
     # Link to operation (or create new one)
     so = refs.get("so_number")
     if so:
+        subject = raw.get("subject", "")
+        body    = raw.get("body", "")
         op = db.query(Operation).filter(Operation.so_number == so).first()
         if not op:
-            op = _create_operation(so, refs, db)
+            op = _create_operation(so, refs, subject, body, db)
         else:
-            _update_operation(op, refs, received_at)
+            _update_operation(op, refs, subject, body, received_at)
         email.operation_id = op.id
         db.flush()
 
 
-def _create_operation(so: str, refs: dict, db: Session) -> Operation:
-    status      = detect_status(refs.get("so_number", ""), "") or "desconocido"
-    delay_causes = detect_delays(refs.get("so_number", ""), "")
+def _create_operation(so: str, refs: dict, subject: str, body: str, db: Session) -> Operation:
+    status      = detect_status(subject, body) or "desconocido"
+    delay_causes = detect_delays(subject, body)
 
     op = Operation(
         so_number           = so,
@@ -156,7 +158,7 @@ def _create_operation(so: str, refs: dict, db: Session) -> Operation:
     return op
 
 
-def _update_operation(op: Operation, refs: dict, received_at) -> None:
+def _update_operation(op: Operation, refs: dict, subject: str, body: str, received_at) -> None:
     if refs.get("bl_number") and not op.bl_number:
         op.bl_number = refs["bl_number"]
     if refs.get("awb_number") and not op.awb_number:

@@ -21,7 +21,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DOCS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── App ───────────────────────────────────────────────────
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.3"
 APP_NAME    = "Control Tower IA"
 
 # ── Outlook sync ──────────────────────────────────────────
