@@ -70,7 +70,8 @@ class OutlookConnector:
             messages.Sort("[ReceivedTime]", True)    # newest first
             for msg in messages:
                 try:
-                    received = _com_date(msg.ReceivedTime)
+                    # Sent items may have ReceivedTime = None; fall back to SentOn
+                    received = _com_date(msg.ReceivedTime) or _com_date(getattr(msg, 'SentOn', None))
                     if received and received < cutoff:
                         break       # items are sorted desc; stop when too old
                     data = self._extract_message(msg)
@@ -86,7 +87,7 @@ class OutlookConnector:
             entry_id    = str(msg.EntryID or "")
             subject     = str(msg.Subject or "")
             sender      = str(getattr(msg, "SenderEmailAddress", "") or msg.SenderName or "")
-            received    = _com_date(msg.ReceivedTime)
+            received    = _com_date(msg.ReceivedTime) or _com_date(getattr(msg, 'SentOn', None))
             body        = str(msg.Body or "")[:8000]    # cap to 8 KB
 
             attachments = []
