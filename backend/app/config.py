@@ -27,12 +27,3 @@ APP_NAME    = "Control Tower IA"
 # ── Outlook sync ──────────────────────────────────────────
 DEFAULT_SYNC_DAYS = 30
 
-# ── Logistics keywords for email filtering ────────────────
-LOGISTICS_KEYWORDS = [
-    "SO-", "service order", "delivery", "shipment", "embarque",
-    "BL ", "B/L", "bill of lading", "AWB", "airway bill",
-    "forwarder", "aduana", "customs", "transito", "tránsito",
-    "ETD", "ETA", "pickup", "freight", "flete",
-    "warehouse", "almacen", "costeo", "OP-",
-    "booking", "consolidation", "consolidación",
-]

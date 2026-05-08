@@ -6,7 +6,8 @@ from typing import Any
 import pythoncom
 import win32com.client
 
-from app.config import DEFAULT_SYNC_DAYS, LOGISTICS_KEYWORDS
+from app.config import DEFAULT_SYNC_DAYS
+from app.operations.extractor import is_logistics_email
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ class OutlookConnector:
                     if received and received < cutoff:
                         break       # items are sorted desc; stop when too old
                     data = self._extract_message(msg)
-                    if data:
+                    if data and is_logistics_email(data["subject"], data["body"]):
                         result.append(data)
                 except Exception as exc:
                     logger.debug("Skip message: %s", exc)

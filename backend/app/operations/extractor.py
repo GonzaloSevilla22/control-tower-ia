@@ -56,6 +56,40 @@ _FORWARDER_PATTERNS = [
     r'Geodis|Bolloré|Bolloré Logistics|Ceva|Rhenus)\b',
 ]
 
+# ── Logistics email filter ────────────────────────────────
+# An email is logistics if its subject/body contains at least one
+# structured reference OR a logistics action keyword.
+
+_FILTER_REFERENCE_PATTERNS = [
+    r'\bService\s+Order\b',         # Service Order NNNNN
+    r'\bSO[-\s#]?\d{5,}',           # SO-12345 / SO 12345
+    r'\bDN[-\s#]?\d{6,}',           # DN 16107309
+    r'\bDelivery\s+(?:Number|No)\b',
+    r'\bOP[-\s#]?[A-Z]{0,4}\d{3,}', # OP DP2211 / OP 12345
+    r'\bAWB[-:\s#]+\S',             # AWB ...
+    r'\bB/?L[-:\s#]+[A-Z0-9]',      # BL / B/L ...
+    r'\bHBL\b', r'\bMBL\b',
+    r'\bSTOR\d{4,}',                # STOR0158537
+    r'\b\d{3}-\d{8}\b',             # IATA AWB 123-12345678
+]
+
+_FILTER_KEYWORD_PATTERNS = [
+    r'\bbooking\b',
+    r'\bembarque\b', r'\bshipment\b', r'\bshipper\b',
+    r'\bcustoms\b', r'\baduana\b', r'\bdespacho\b',
+    r'\bfreight\b', r'\bflete\b',
+    r'\bforwarder\b', r'\bagente\s+de\s+carga\b',
+    r'\bETD\b', r'\bETA\b',
+    r'\bpickup\b', r'\brecolecci',
+    r'\bclearance\b', r'\bliberaci',
+    r'\bconsolidaci',
+    r'\ben\s+tr[aá]nsito\b', r'\bin\s+transit\b',
+    r'\bwarehouse\b', r'\balmac[eé]n\b',
+    r'\bcosteo\b',
+    r'\bpacking\s+list\b',
+    r'\bbl\s+number\b', r'\bbill\s+of\s+lading\b',
+]
+
 # ── Status keywords ───────────────────────────────────────
 
 _STATUS_MAP: dict[str, list[str]] = {
@@ -169,6 +203,23 @@ _DATE_PATTERNS = [
 
 
 # ── Public API ────────────────────────────────────────────
+
+def is_logistics_email(subject: str, body: str) -> bool:
+    """Return True if the email looks like a logistics email.
+
+    Checks subject first (fast path), then first 1000 chars of body.
+    An email qualifies if it contains any structured reference (SO, DN, OP,
+    STOR, BL, AWB) OR any logistics action keyword.
+    """
+    text = subject + " " + body[:1000]
+    for p in _FILTER_REFERENCE_PATTERNS:
+        if re.search(p, text, re.IGNORECASE):
+            return True
+    for p in _FILTER_KEYWORD_PATTERNS:
+        if re.search(p, text, re.IGNORECASE):
+            return True
+    return False
+
 
 def extract_references(subject: str, body: str) -> dict[str, Any]:
     text = f"{subject} {body}"
