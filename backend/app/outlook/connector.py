@@ -51,21 +51,41 @@ class OutlookConnector:
 
         cutoff = datetime.now() - timedelta(days=days)
         emails: list[dict] = []
+        seen_ids: set[str] = set()
 
-        inbox = self._namespace.GetDefaultFolder(6)     # olFolderInbox = 6
-        self._scan_folder(inbox, cutoff, emails)
-
-        # Also scan Sent Items
+        # Scan all folders in the default store recursively
         try:
-            sent = self._namespace.GetDefaultFolder(5)  # olFolderSentMail = 5
-            self._scan_folder(sent, cutoff, emails)
+            root = self._namespace.GetDefaultFolder(6).Parent  # account root
+            self._scan_folder_recursive(root, cutoff, emails, seen_ids, depth=0)
         except Exception:
-            pass
+            # Fallback: just scan inbox + sent
+            inbox = self._namespace.GetDefaultFolder(6)
+            self._scan_folder_recursive(inbox, cutoff, emails, seen_ids, depth=0)
+            try:
+                sent = self._namespace.GetDefaultFolder(5)
+                self._scan_folder_recursive(sent, cutoff, emails, seen_ids, depth=0)
+            except Exception:
+                pass
 
         logger.info("Scanned %d emails (last %d days)", len(emails), days)
         return emails
 
-    def _scan_folder(self, folder, cutoff: datetime, result: list[dict]) -> None:
+    def _scan_folder_recursive(
+        self, folder, cutoff: datetime, result: list[dict], seen: set[str], depth: int
+    ) -> None:
+        if depth > 6:
+            return
+        self._scan_folder(folder, cutoff, result, seen)
+        try:
+            for subfolder in folder.Folders:
+                try:
+                    self._scan_folder_recursive(subfolder, cutoff, result, seen, depth + 1)
+                except Exception as exc:
+                    logger.debug("Subfolder error: %s", exc)
+        except Exception:
+            pass
+
+    def _scan_folder(self, folder, cutoff: datetime, result: list[dict], seen: set[str] | None = None) -> None:
         try:
             messages = folder.Items
             messages.Sort("[ReceivedTime]", True)    # newest first
@@ -76,7 +96,14 @@ class OutlookConnector:
                     if received and received < cutoff:
                         break       # items are sorted desc; stop when too old
                     data = self._extract_message(msg)
-                    if data and is_logistics_email(data["subject"], data["body"]):
+                    if not data:
+                        continue
+                    # Deduplicate by entry_id across folders
+                    if seen is not None:
+                        if data["entry_id"] in seen:
+                            continue
+                        seen.add(data["entry_id"])
+                    if is_logistics_email(data["subject"], data["body"]):
                         result.append(data)
                 except Exception as exc:
                     logger.debug("Skip message: %s", exc)

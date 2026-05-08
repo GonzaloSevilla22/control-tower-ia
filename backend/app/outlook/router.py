@@ -29,34 +29,54 @@ def debug_scan(days: int = 7):
         from datetime import timedelta
         cutoff = datetime.utcnow() - timedelta(days=days)
 
-        inbox = conn._namespace.GetDefaultFolder(6)
-        messages = inbox.Items
-        messages.Sort("[ReceivedTime]", True)
+        from app.outlook.connector import _com_date
 
         total_found = 0
         passed_filter = 0
         rejected_samples: list[str] = []
         passed_samples: list[str] = []
+        folders_scanned: list[str] = []
 
-        for msg in messages:
+        def scan_folder_debug(folder, depth=0):
+            nonlocal total_found, passed_filter
+            if depth > 6:
+                return
             try:
-                from app.outlook.connector import _com_date
-                received = _com_date(msg.ReceivedTime) or _com_date(getattr(msg, 'SentOn', None))
-                if received and received < cutoff:
-                    break
-                subject = str(msg.Subject or "")
-                body_preview = str(msg.Body or "")[:300]
-                total_found += 1
-
-                if is_logistics_email(subject, body_preview):
-                    passed_filter += 1
-                    if len(passed_samples) < 5:
-                        passed_samples.append(subject)
-                else:
-                    if len(rejected_samples) < 10:
-                        rejected_samples.append(subject)
+                name = str(folder.Name)
+                folders_scanned.append("  " * depth + name)
+                messages = folder.Items
+                messages.Sort("[ReceivedTime]", True)
+                for msg in messages:
+                    try:
+                        received = _com_date(msg.ReceivedTime) or _com_date(getattr(msg, 'SentOn', None))
+                        if received and received < cutoff:
+                            break
+                        subject = str(msg.Subject or "")
+                        body_preview = str(msg.Body or "")[:300]
+                        total_found += 1
+                        if is_logistics_email(subject, body_preview):
+                            passed_filter += 1
+                            if len(passed_samples) < 5:
+                                passed_samples.append(subject)
+                        else:
+                            if len(rejected_samples) < 10:
+                                rejected_samples.append(subject)
+                    except Exception:
+                        pass
             except Exception:
                 pass
+            try:
+                for sub in folder.Folders:
+                    scan_folder_debug(sub, depth + 1)
+            except Exception:
+                pass
+
+        try:
+            root = conn._namespace.GetDefaultFolder(6).Parent
+            scan_folder_debug(root)
+        except Exception:
+            inbox = conn._namespace.GetDefaultFolder(6)
+            scan_folder_debug(inbox)
 
         return {
             "days_scanned": days,
@@ -64,6 +84,7 @@ def debug_scan(days: int = 7):
             "passed_filter": passed_filter,
             "rejected_samples": rejected_samples,
             "passed_samples": passed_samples,
+            "folders_scanned": folders_scanned[:30],
         }
     except Exception as exc:
         return {"error": str(exc)}
