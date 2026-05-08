@@ -3,6 +3,7 @@ import Sidebar, { type View } from './components/Sidebar'
 import Dashboard from './components/Dashboard'
 import OperationsList from './components/OperationsList'
 import OperationDetail from './components/OperationDetail'
+import GraphAuth from './components/GraphAuth'
 
 export default function App() {
   const [view, setView]           = useState<View>('dashboard')
@@ -43,9 +44,10 @@ export default function App() {
           </>
         )}
 
-        {view === 'documents' && <PlaceholderView icon="📁" title="Gestión Documental" desc="Disponible en Etapa 4" />}
-        {view === 'alerts'    && <PlaceholderView icon="🔔" title="Alertas Críticas"   desc="Disponible en Etapa 3" />}
-        {view === 'copilot'   && <PlaceholderView icon="🤖" title="Copiloto IA"        desc="Disponible en Etapa 5 (requiere Ollama)" />}
+        {view === 'documents'   && <PlaceholderView icon="📁" title="Gestión Documental" desc="Disponible en Etapa 4" />}
+        {view === 'alerts'      && <PlaceholderView icon="🔔" title="Alertas Críticas"   desc="Disponible en Etapa 3" />}
+        {view === 'copilot'     && <PlaceholderView icon="🤖" title="Copiloto IA"        desc="Disponible en Etapa 5 (requiere Ollama)" />}
+        {view === 'graph-auth'  && <div className="flex-1 overflow-hidden"><GraphAuth /></div>}
       </main>
     </div>
   )

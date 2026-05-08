@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.database.models import EmailRecord, Operation, SyncLog
 from app.outlook.connector import get_connector
+from app.outlook.graph_connector import (
+    get_graph_connector, get_client_id, save_client_id,
+    set_pending_flow, get_pending_flow,
+)
 from app.operations.extractor import extract_references, detect_status, detect_delays, is_logistics_email
 
 logger = logging.getLogger(__name__)
@@ -90,6 +94,52 @@ def debug_scan(days: int = 7):
         return {"error": str(exc)}
 
 
+# ── Graph auth ───────────────────────────────────────────
+
+class ClientIdRequest(BaseModel):
+    client_id: str
+
+@router.post("/graph/setup")
+def graph_setup(req: ClientIdRequest):
+    save_client_id(req.client_id)
+    return {"ok": True}
+
+@router.get("/graph/auth-status")
+def graph_auth_status():
+    gc = get_graph_connector()
+    return {
+        "client_id_configured": get_client_id() is not None,
+        "authenticated": gc.is_authenticated(),
+    }
+
+@router.post("/graph/start-login")
+def graph_start_login():
+    gc = get_graph_connector()
+    try:
+        flow = gc.start_device_flow()
+        inner = flow.pop("_flow")
+        set_pending_flow(inner)
+        return flow   # user_code, verification_uri, message
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+@router.post("/graph/complete-login")
+def graph_complete_login():
+    flow = get_pending_flow()
+    if not flow:
+        raise HTTPException(status_code=400, detail="No hay un login pendiente. Iniciá el proceso de nuevo.")
+    gc = get_graph_connector()
+    ok = gc.complete_device_flow(flow)
+    if ok:
+        return {"ok": True}
+    raise HTTPException(status_code=401, detail="Autenticación fallida o expirada. Intentá de nuevo.")
+
+@router.post("/graph/logout")
+def graph_logout():
+    get_graph_connector().logout()
+    return {"ok": True}
+
+
 # ── Status ────────────────────────────────────────────────
 @router.get("/status")
 def outlook_status():
@@ -113,8 +163,12 @@ def sync_outlook(req: SyncRequest, db: Session = Depends(get_db)):
     db.commit()
 
     try:
-        conn        = get_connector()
-        raw_emails  = conn.sync_emails(days=req.days)
+        gc = get_graph_connector()
+        if gc.is_authenticated():
+            raw_emails = gc.sync_emails(days=req.days)
+        else:
+            conn = get_connector()
+            raw_emails = conn.sync_emails(days=req.days)
 
         new_ops     = 0
         updated     = 0

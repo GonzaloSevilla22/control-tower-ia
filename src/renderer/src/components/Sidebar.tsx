@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getHealth } from '../api/client'
 
-export type View = 'dashboard' | 'operations' | 'documents' | 'alerts' | 'copilot'
+export type View = 'dashboard' | 'operations' | 'documents' | 'alerts' | 'copilot' | 'graph-auth'
 
 interface NavItem {
   id: View
@@ -14,7 +14,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'operations', label: 'Operaciones',    icon: '📦' },
   { id: 'documents',  label: 'Documentos',     icon: '📁' },
   { id: 'alerts',     label: 'Alertas',        icon: '🔔' },
-  { id: 'copilot',    label: 'Copiloto IA',    icon: '🤖' }
+  { id: 'copilot',    label: 'Copiloto IA',    icon: '🤖' },
+  { id: 'graph-auth', label: 'Microsoft 365',  icon: '🔑' },
 ]
 
 interface Props {
