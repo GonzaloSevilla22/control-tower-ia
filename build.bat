@@ -58,12 +58,12 @@ if errorlevel 1 (
 :: ── 5. Crear ZIP distribuible ─────────────────────────────
 echo.
 echo [5/5] Creando ZIP distribuible...
-powershell -Command "Compress-Archive -Path 'dist\win-unpacked\*' -DestinationPath 'dist\ControlTowerIA_v1.0.0_Windows.zip' -Force"
+powershell -Command "Compress-Archive -Path 'dist\win-unpacked\*' -DestinationPath 'dist\ControlTowerIA_v1.0.3_Windows.zip' -Force"
 
 echo.
 echo  ╔═══════════════════════════════════════════════════════════╗
 echo  ║   Build completado!                                      ║
-echo  ║   Archivo: dist\ControlTowerIA_v1.0.0_Windows.zip       ║
+echo  ║   Archivo: dist\ControlTowerIA_v1.0.3_Windows.zip       ║
 echo  ║   Instrucciones: ver INSTALL.md                         ║
 echo  ╚═══════════════════════════════════════════════════════════╝
 echo.

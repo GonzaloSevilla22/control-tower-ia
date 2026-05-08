@@ -1,6 +1,6 @@
 {
   "name": "control-tower-ia",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "Control Tower IA - Automatización Logística Internacional",
   "main": "out/main/index.js",
   "scripts": {

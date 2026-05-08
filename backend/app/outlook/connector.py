@@ -61,7 +61,7 @@ class OutlookConnector:
         except Exception:
             pass
 
-        logger.info("Scanned %d logistics emails (last %d days)", len(emails), days)
+        logger.info("Scanned %d emails (last %d days)", len(emails), days)
         return emails
 
     def _scan_folder(self, folder, cutoff: datetime, result: list[dict]) -> None:
@@ -74,7 +74,7 @@ class OutlookConnector:
                     if received and received < cutoff:
                         break       # items are sorted desc; stop when too old
                     data = self._extract_message(msg)
-                    if data and self._is_logistics_email(data["subject"], data["body"]):
+                    if data:
                         result.append(data)
                 except Exception as exc:
                     logger.debug("Skip message: %s", exc)
