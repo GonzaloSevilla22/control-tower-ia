@@ -9,10 +9,64 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.database.models import EmailRecord, Operation, SyncLog
 from app.outlook.connector import get_connector
-from app.operations.extractor import extract_references, detect_status, detect_delays
+from app.operations.extractor import extract_references, detect_status, detect_delays, is_logistics_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# ── Debug scan ───────────────────────────────────────────
+@router.get("/debug-scan")
+def debug_scan(days: int = 7):
+    """Returns raw email subjects before and after the logistics filter.
+    Use this to diagnose why sync finds 0 emails.
+    """
+    try:
+        conn = get_connector()
+        if not conn._namespace:
+            conn.connect()
+
+        from datetime import timedelta
+        cutoff = datetime.utcnow() - timedelta(days=days)
+
+        inbox = conn._namespace.GetDefaultFolder(6)
+        messages = inbox.Items
+        messages.Sort("[ReceivedTime]", True)
+
+        total_found = 0
+        passed_filter = 0
+        rejected_samples: list[str] = []
+        passed_samples: list[str] = []
+
+        for msg in messages:
+            try:
+                from app.outlook.connector import _com_date
+                received = _com_date(msg.ReceivedTime) or _com_date(getattr(msg, 'SentOn', None))
+                if received and received < cutoff:
+                    break
+                subject = str(msg.Subject or "")
+                body_preview = str(msg.Body or "")[:300]
+                total_found += 1
+
+                if is_logistics_email(subject, body_preview):
+                    passed_filter += 1
+                    if len(passed_samples) < 5:
+                        passed_samples.append(subject)
+                else:
+                    if len(rejected_samples) < 10:
+                        rejected_samples.append(subject)
+            except Exception:
+                pass
+
+        return {
+            "days_scanned": days,
+            "total_emails_in_inbox": total_found,
+            "passed_filter": passed_filter,
+            "rejected_samples": rejected_samples,
+            "passed_samples": passed_samples,
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 # ── Status ────────────────────────────────────────────────

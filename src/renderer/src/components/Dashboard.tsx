@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { getStats, syncOutlook } from '../api/client'
+import { getStats, syncOutlook, debugScan } from '../api/client'
 import type { DashboardStats, SyncResult } from '../types'
 import type { View } from './Sidebar'
 
@@ -12,6 +12,8 @@ export default function Dashboard({ onNavigate }: Props) {
   const [syncing, setSyncing]       = useState(false)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [error, setError]           = useState<string | null>(null)
+  const [debugResult, setDebugResult] = useState<Awaited<ReturnType<typeof debugScan>> | null>(null)
+  const [debugging, setDebugging]   = useState(false)
   const retriesRef                  = useRef(0)
   const startTimeRef                = useRef(Date.now())
 
@@ -52,6 +54,17 @@ export default function Dashboard({ onNavigate }: Props) {
     }
   }
 
+  const handleDebug = async () => {
+    setDebugging(true)
+    setDebugResult(null)
+    try {
+      const result = await debugScan(7)
+      setDebugResult(result)
+    } finally {
+      setDebugging(false)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full bg-slate-900 overflow-y-auto">
       {/* Header */}
@@ -64,14 +77,24 @@ export default function Dashboard({ onNavigate }: Props) {
               : 'Sin sincronizar aún'}
           </p>
         </div>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-blue-600/20"
-        >
-          <span className={syncing ? 'animate-spin' : ''}>🔄</span>
-          {syncing ? 'Sincronizando...' : 'Sincronizar Outlook'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDebug}
+            disabled={debugging}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            <span>🔍</span>
+            {debugging ? 'Escaneando...' : 'Diagnóstico'}
+          </button>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-blue-600/20"
+          >
+            <span className={syncing ? 'animate-spin' : ''}>🔄</span>
+            {syncing ? 'Sincronizando...' : 'Sincronizar Outlook'}
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 px-6 py-5 space-y-6">
@@ -97,6 +120,46 @@ export default function Dashboard({ onNavigate }: Props) {
               <strong>{syncResult.updated}</strong> actualizadas
             </span>
             <button onClick={() => setSyncResult(null)} className="ml-auto text-emerald-400">✕</button>
+          </div>
+        )}
+
+        {/* Debug panel */}
+        {debugResult && (
+          <div className="bg-slate-800/80 border border-slate-600 rounded-xl px-4 py-3 text-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-300 font-medium">🔍 Diagnóstico de correos (últimos {debugResult.days_scanned} días)</span>
+              <button onClick={() => setDebugResult(null)} className="text-slate-500 hover:text-slate-200">✕</button>
+            </div>
+            {debugResult.error ? (
+              <p className="text-red-400">{debugResult.error}</p>
+            ) : (
+              <>
+                <div className="flex gap-6 text-xs">
+                  <span className="text-slate-400">Total en bandeja: <strong className="text-white">{debugResult.total_emails_in_inbox}</strong></span>
+                  <span className="text-slate-400">Pasan el filtro: <strong className="text-emerald-400">{debugResult.passed_filter}</strong></span>
+                  <span className="text-slate-400">Descartados: <strong className="text-amber-400">{debugResult.total_emails_in_inbox - debugResult.passed_filter}</strong></span>
+                </div>
+                {debugResult.passed_samples.length > 0 && (
+                  <div>
+                    <p className="text-xs text-emerald-400 mb-1">✅ Ejemplos que pasan:</p>
+                    {debugResult.passed_samples.map((s, i) => (
+                      <p key={i} className="text-xs text-slate-300 truncate">• {s}</p>
+                    ))}
+                  </div>
+                )}
+                {debugResult.rejected_samples.length > 0 && (
+                  <div>
+                    <p className="text-xs text-amber-400 mb-1">⚠️ Ejemplos descartados:</p>
+                    {debugResult.rejected_samples.map((s, i) => (
+                      <p key={i} className="text-xs text-slate-500 truncate">• {s}</p>
+                    ))}
+                  </div>
+                )}
+                {debugResult.total_emails_in_inbox === 0 && (
+                  <p className="text-amber-300 text-xs">⚠️ Outlook no devolvió ningún correo. Verificá que esté abierto y que la bandeja tenga correos de los últimos {debugResult.days_scanned} días.</p>
+                )}
+              </>
+            )}
           </div>
         )}
 

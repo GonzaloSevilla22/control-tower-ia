@@ -27,6 +27,15 @@ export const getOutlookStatus = (): Promise<OutlookStatus> =>
 export const syncOutlook = (days = 30): Promise<SyncResult> =>
   http.post('/api/outlook/sync', { days }).then((r) => r.data)
 
+export const debugScan = (days = 7): Promise<{
+  days_scanned: number
+  total_emails_in_inbox: number
+  passed_filter: number
+  rejected_samples: string[]
+  passed_samples: string[]
+  error?: string
+}> => http.get('/api/outlook/debug-scan', { params: { days } }).then((r) => r.data)
+
 // ── Stats ─────────────────────────────────────────────────
 export const getStats = (): Promise<DashboardStats> =>
   http.get('/api/stats').then((r) => r.data)
