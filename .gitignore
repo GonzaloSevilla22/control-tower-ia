@@ -1,0 +1,15 @@
+node_modules/
+out/
+dist/
+backend/venv/
+backend/__pycache__/
+backend/app/__pycache__/
+backend/app/**/__pycache__/
+data/
+*.db
+*.db-journal
+*.pyc
+.env
+.DS_Store
+*.log
+resources/icon.ico
