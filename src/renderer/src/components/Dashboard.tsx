@@ -8,21 +8,29 @@ interface Props {
 }
 
 export default function Dashboard({ onNavigate }: Props) {
-  const [stats, setStats]         = useState<DashboardStats | null>(null)
-  const [syncing, setSyncing]     = useState(false)
+  const [stats, setStats]           = useState<DashboardStats | null>(null)
+  const [syncing, setSyncing]       = useState(false)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
-  const [error, setError]         = useState<string | null>(null)
+  const [error, setError]           = useState<string | null>(null)
+  const [retries, setRetries]       = useState(0)
 
   const loadStats = useCallback(() => {
     getStats()
-      .then(setStats)
-      .catch(() => setError('No se pudo conectar al backend. Verifica que el servidor Python esté corriendo.'))
-  }, [])
+      .then((data) => { setStats(data); setError(null) })
+      .catch(() => {
+        setRetries((r) => r + 1)
+        // Solo mostrar error después de 3 intentos fallidos (da tiempo al backend de arrancar)
+        if (retries >= 3) {
+          setError('No se pudo conectar al backend. Verifica que la app esté corriendo correctamente.')
+        }
+      })
+  }, [retries])
 
   useEffect(() => {
-    loadStats()
+    // Primer intento con pequeño delay para dar tiempo al backend
+    const initial = setTimeout(loadStats, 1500)
     const id = setInterval(loadStats, 30000)
-    return () => clearInterval(id)
+    return () => { clearTimeout(initial); clearInterval(id) }
   }, [loadStats])
 
   const handleSync = async () => {
