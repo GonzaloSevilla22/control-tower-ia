@@ -13,27 +13,28 @@ export default function Dashboard({ onNavigate }: Props) {
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [error, setError]           = useState<string | null>(null)
   const retriesRef                  = useRef(0)
+  const startTimeRef                = useRef(Date.now())
 
-  // useRef para retries evita recrear loadStats en cada intento fallido
   const loadStats = useCallback(() => {
     getStats()
       .then((data) => {
         setStats(data)
-        setError(null)          // limpia error en cuanto el backend responde
-        retriesRef.current = 0  // resetea contador de reintentos
+        setError(null)
+        retriesRef.current = 0
       })
       .catch(() => {
         retriesRef.current += 1
-        // Sólo mostrar error visual después de 4 intentos fallidos (~6 segundos)
-        if (retriesRef.current >= 4) {
+        // Startup grace period: 25s from mount — backend is still warming up
+        const elapsed = Date.now() - startTimeRef.current
+        if (elapsed > 25000 && retriesRef.current >= 3) {
           setError('No se pudo conectar al backend. Verifica que la app esté corriendo correctamente.')
         }
       })
-  }, []) // sin dependencias — estable durante toda la vida del componente
+  }, [])
 
   useEffect(() => {
-    const initial = setTimeout(loadStats, 1500)
-    const id      = setInterval(loadStats, 30000)
+    const initial = setTimeout(loadStats, 2000)
+    const id      = setInterval(loadStats, 15000)
     return () => { clearTimeout(initial); clearInterval(id) }
   }, [loadStats])
 

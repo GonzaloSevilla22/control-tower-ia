@@ -1,6 +1,8 @@
 """FastAPI application — main entry point."""
 from contextlib import asynccontextmanager
 from datetime import datetime
+import threading
+import time
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,10 +16,34 @@ from app.outlook.router import router as outlook_router
 from app.operations.router import router as operations_router
 from app.documents.router import router as documents_router
 
+# Outlook availability — checked in a background thread, never blocks requests
+_outlook_status: dict = {"available": False, "checked_at": 0.0}
+_outlook_lock = threading.Lock()
+
+
+def _refresh_outlook_status() -> None:
+    """Run in background thread every 30s — never called from a request handler."""
+    while True:
+        try:
+            import pythoncom
+            import win32com.client
+            pythoncom.CoInitialize()
+            ol = win32com.client.Dispatch("Outlook.Application")
+            available = ol is not None
+            pythoncom.CoUninitialize()
+        except Exception:
+            available = False
+        with _outlook_lock:
+            _outlook_status["available"] = available
+            _outlook_status["checked_at"] = time.time()
+        time.sleep(30)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_tables()
+    t = threading.Thread(target=_refresh_outlook_status, daemon=True)
+    t.start()
     yield
 
 
@@ -44,7 +70,9 @@ app.include_router(documents_router,   prefix="/api/documents",   tags=["Documen
 # ── Health ────────────────────────────────────────────────
 @app.get("/api/health")
 def health_check():
-    outlook_ok = _check_outlook()
+    # Never blocks — Outlook status comes from background thread
+    with _outlook_lock:
+        outlook_ok = _outlook_status["available"]
     return {
         "status": "ok",
         "version": APP_VERSION,
@@ -54,17 +82,6 @@ def health_check():
     }
 
 
-def _check_outlook() -> bool:
-    try:
-        import win32com.client  # noqa
-        import pythoncom
-        pythoncom.CoInitialize()
-        ol = win32com.client.Dispatch("Outlook.Application")
-        return ol is not None
-    except Exception:
-        return False
-
-
 # ── Stats ─────────────────────────────────────────────────
 @app.get("/api/stats")
 def get_stats(db: Session = Depends(get_db)):
@@ -72,9 +89,12 @@ def get_stats(db: Session = Depends(get_db)):
     active = db.query(func.count(Operation.id)).filter(
         Operation.status.notin_(["entregada_warehouse", "enviada_costeo"])
     ).scalar() or 0
+    # JSON columns in SQLite are stored as text — use cast comparison
+    from sqlalchemy import cast, String
     delayed = db.query(func.count(Operation.id)).filter(
-        Operation.delay_causes != "[]",
         Operation.delay_causes.isnot(None),
+        cast(Operation.delay_causes, String) != "[]",
+        cast(Operation.delay_causes, String) != "null",
     ).scalar() or 0
     pending_docs = db.query(func.count(Operation.id)).filter(
         Operation.has_pending_docs == True  # noqa: E712
