@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(npx electron-builder *)",
+      "Bash(gh pr create --base main --head master --title 'feat: Etapa 1 — Control Tower IA base completa' --body ' *)",
+      "Bash(git branch *)",
+      "Bash(gh repo *)",
+      "Bash(git checkout *)",
+      "Bash(npm run *)",
+      "Bash(./venv/Scripts/pip install *)",
+      "Bash(./venv/Scripts/python.exe -c \"import asar; print\\('asar ok'\\)\")",
+      "Bash(npx asar *)",
+      "Bash(# Reemplazar los archivos compilados nuevos en el asar extraído *)",
+      "Bash(rm -rf \"C:/Users/Usuario/Desktop/LEO/dist/app-extracted\")",
+      "Bash(powershell -Command ' *)",
+      "Bash(gh pr create --base main --head master --title 'fix: backend startup timing + loading screen' --body ' *)",
+      "Bash(cp out/main/index.js       dist/app-extracted/out/main/index.js)",
+      "Bash(cp out/preload/index.js    dist/app-extracted/out/preload/index.js)",
+      "Bash(cp out/renderer/index.html dist/app-extracted/out/renderer/index.html)",
+      "Bash(cp out/renderer/assets/*   dist/app-extracted/out/renderer/assets/)",
+      "Bash(rm -rf dist/app-extracted)",
+      "Bash(cmd /c \"build.bat\")",
+      "Bash(\"venv\\\\Scripts\\\\python.exe\" -m PyInstaller run.spec --clean --noconfirm --distpath dist)",
+      "Bash(dir dist\\\\win-unpacked)",
+      "PowerShell($items = Get-ChildItem \"C:\\\\Users\\\\Usuario\\\\Desktop\\\\LEO\\\\dist\\\\win-unpacked\"; Write-Output \"Count: $\\($items.Count\\)\"; $items | ForEach-Object { Write-Output $_.Name })",
+      "Bash(\"venv\\\\Scripts\\\\pip.exe\" install *)"
+    ]
+  }
+}

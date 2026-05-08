@@ -9,10 +9,135 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.database.models import EmailRecord, Operation, SyncLog
 from app.outlook.connector import get_connector
-from app.operations.extractor import extract_references, detect_status, detect_delays
+from app.outlook.graph_connector import (
+    get_graph_connector, get_client_id, save_client_id,
+    set_pending_flow, get_pending_flow,
+)
+from app.operations.extractor import extract_references, detect_status, detect_delays, is_logistics_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# ── Debug scan ───────────────────────────────────────────
+@router.get("/debug-scan")
+def debug_scan(days: int = 7):
+    """Returns raw email subjects before and after the logistics filter.
+    Use this to diagnose why sync finds 0 emails.
+    """
+    try:
+        conn = get_connector()
+        if not conn._namespace:
+            conn.connect()
+
+        from datetime import timedelta
+        cutoff = datetime.utcnow() - timedelta(days=days)
+
+        from app.outlook.connector import _com_date
+
+        total_found = 0
+        passed_filter = 0
+        rejected_samples: list[str] = []
+        passed_samples: list[str] = []
+        folders_scanned: list[str] = []
+
+        def scan_folder_debug(folder, depth=0):
+            nonlocal total_found, passed_filter
+            if depth > 6:
+                return
+            try:
+                name = str(folder.Name)
+                folders_scanned.append("  " * depth + name)
+                messages = folder.Items
+                messages.Sort("[ReceivedTime]", True)
+                for msg in messages:
+                    try:
+                        received = _com_date(msg.ReceivedTime) or _com_date(getattr(msg, 'SentOn', None))
+                        if received and received < cutoff:
+                            break
+                        subject = str(msg.Subject or "")
+                        body_preview = str(msg.Body or "")[:300]
+                        total_found += 1
+                        if is_logistics_email(subject, body_preview):
+                            passed_filter += 1
+                            if len(passed_samples) < 5:
+                                passed_samples.append(subject)
+                        else:
+                            if len(rejected_samples) < 10:
+                                rejected_samples.append(subject)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            try:
+                for sub in folder.Folders:
+                    scan_folder_debug(sub, depth + 1)
+            except Exception:
+                pass
+
+        try:
+            root = conn._namespace.GetDefaultFolder(6).Parent
+            scan_folder_debug(root)
+        except Exception:
+            inbox = conn._namespace.GetDefaultFolder(6)
+            scan_folder_debug(inbox)
+
+        return {
+            "days_scanned": days,
+            "total_emails_in_inbox": total_found,
+            "passed_filter": passed_filter,
+            "rejected_samples": rejected_samples,
+            "passed_samples": passed_samples,
+            "folders_scanned": folders_scanned[:30],
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+# ── Graph auth ───────────────────────────────────────────
+
+class ClientIdRequest(BaseModel):
+    client_id: str
+
+@router.post("/graph/setup")
+def graph_setup(req: ClientIdRequest):
+    save_client_id(req.client_id)
+    return {"ok": True}
+
+@router.get("/graph/auth-status")
+def graph_auth_status():
+    gc = get_graph_connector()
+    return {
+        "client_id_configured": get_client_id() is not None,
+        "authenticated": gc.is_authenticated(),
+    }
+
+@router.post("/graph/start-login")
+def graph_start_login():
+    gc = get_graph_connector()
+    try:
+        flow = gc.start_device_flow()
+        inner = flow.pop("_flow")
+        set_pending_flow(inner)
+        return flow   # user_code, verification_uri, message
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+@router.post("/graph/complete-login")
+def graph_complete_login():
+    flow = get_pending_flow()
+    if not flow:
+        raise HTTPException(status_code=400, detail="No hay un login pendiente. Iniciá el proceso de nuevo.")
+    gc = get_graph_connector()
+    ok = gc.complete_device_flow(flow)
+    if ok:
+        return {"ok": True}
+    raise HTTPException(status_code=401, detail="Autenticación fallida o expirada. Intentá de nuevo.")
+
+@router.post("/graph/logout")
+def graph_logout():
+    get_graph_connector().logout()
+    return {"ok": True}
 
 
 # ── Status ────────────────────────────────────────────────
@@ -38,8 +163,12 @@ def sync_outlook(req: SyncRequest, db: Session = Depends(get_db)):
     db.commit()
 
     try:
-        conn        = get_connector()
-        raw_emails  = conn.sync_emails(days=req.days)
+        gc = get_graph_connector()
+        if gc.is_authenticated():
+            raw_emails = gc.sync_emails(days=req.days)
+        else:
+            conn = get_connector()
+            raw_emails = conn.sync_emails(days=req.days)
 
         new_ops     = 0
         updated     = 0
