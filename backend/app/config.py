@@ -1,21 +1,31 @@
 """Central configuration — paths and app settings."""
+import os
+import sys
 from pathlib import Path
 
-# ── Paths ─────────────────────────────────────────────────
-BASE_DIR      = Path(__file__).resolve().parent.parent          # backend/
-DATA_DIR      = BASE_DIR.parent / "data"                        # project_root/data/
-DOCS_DIR      = BASE_DIR.parent / "docs_storage"                # project_root/docs_storage/
-DB_PATH       = DATA_DIR / "control_tower.db"
+# ── Paths — dev vs. packaged (PyInstaller) ────────────────
+BASE_DIR = Path(__file__).resolve().parent.parent       # backend/
+
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller bundle — use user's AppData so the folder is writable
+    APP_DATA = Path(os.environ.get('APPDATA', Path.home())) / 'ControlTowerIA'
+else:
+    # Development — use project root
+    APP_DATA = BASE_DIR.parent
+
+DATA_DIR = APP_DATA / "data"
+DOCS_DIR = APP_DATA / "docs_storage"
+DB_PATH  = DATA_DIR / "control_tower.db"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DOCS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── App ───────────────────────────────────────────────────
-APP_VERSION  = "1.0.0"
-APP_NAME     = "Control Tower IA"
+APP_VERSION = "1.0.0"
+APP_NAME    = "Control Tower IA"
 
 # ── Outlook sync ──────────────────────────────────────────
-DEFAULT_SYNC_DAYS = 30          # días hacia atrás para buscar correos
+DEFAULT_SYNC_DAYS = 30
 
 # ── Logistics keywords for email filtering ────────────────
 LOGISTICS_KEYWORDS = [

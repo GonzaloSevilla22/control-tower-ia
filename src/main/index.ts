@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { is } from '@electron-toolkit/utils'
 import { spawn, ChildProcess } from 'child_process'
 import { existsSync } from 'fs'
 
@@ -9,18 +9,20 @@ let pythonProcess: ChildProcess | null = null
 
 function spawnPythonBackend(): void {
   if (is.dev) {
-    // En desarrollo el backend se inicia con start_dev.bat
+    // En desarrollo se inicia con start_dev.bat
     return
   }
 
-  const backendPath = join(process.resourcesPath, 'backend')
-  const venvPython = join(backendPath, 'venv', 'Scripts', 'python.exe')
-  const runScript = join(backendPath, 'run.py')
+  // En producción: PyInstaller generó backend/run.exe dentro de resources
+  const backendExe = join(process.resourcesPath, 'backend', 'run.exe')
 
-  const pythonExe = existsSync(venvPython) ? venvPython : 'python'
+  if (!existsSync(backendExe)) {
+    console.error('[Backend] Executable not found:', backendExe)
+    return
+  }
 
-  pythonProcess = spawn(pythonExe, [runScript], {
-    cwd: backendPath,
+  pythonProcess = spawn(backendExe, [], {
+    cwd: join(process.resourcesPath, 'backend'),
     detached: false,
     stdio: 'pipe'
   })
@@ -64,37 +66,22 @@ function createWindow(): void {
   }
 }
 
-// ── IPC Handlers ──────────────────────────────────────────
+// ── IPC ───────────────────────────────────────────────────
 ipcMain.handle('app:version', () => app.getVersion())
+ipcMain.handle('shell:openPath', (_e, p: string) => shell.openPath(p))
+ipcMain.handle('shell:showItemInFolder', (_e, p: string) => shell.showItemInFolder(p))
 
-ipcMain.handle('shell:openPath', (_event, filePath: string) => {
-  shell.openPath(filePath)
-})
-
-ipcMain.handle('shell:showItemInFolder', (_event, filePath: string) => {
-  shell.showItemInFolder(filePath)
-})
-
-// ── App lifecycle ─────────────────────────────────────────
+// ── Lifecycle ─────────────────────────────────────────────
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.boartlongyear.controltoweria')
-
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
-
+  app.setAppUserModelId('com.boartlongyear.controltoweria')
   spawnPythonBackend()
   createWindow()
-
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
 app.on('window-all-closed', () => {
-  if (pythonProcess) {
-    pythonProcess.kill()
-    pythonProcess = null
-  }
+  if (pythonProcess) { pythonProcess.kill(); pythonProcess = null }
   if (process.platform !== 'darwin') app.quit()
 })
