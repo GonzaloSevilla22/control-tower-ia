@@ -35,9 +35,10 @@ export default function Sidebar({ current, onNavigate }: Props) {
         })
         .catch(() => { setBackendOk(false); setOutlookOk(false) })
 
-    check()
+    // Esperar 2 s antes del primer check para dar tiempo al backend de iniciar
+    const initial = setTimeout(check, 2000)
     const id = setInterval(check, 15000)
-    return () => clearInterval(id)
+    return () => { clearTimeout(initial); clearInterval(id) }
   }, [])
 
   return (
