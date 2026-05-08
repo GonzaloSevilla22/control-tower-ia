@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { getStats, syncOutlook } from '../api/client'
 import type { DashboardStats, SyncResult } from '../types'
 import type { View } from './Sidebar'
@@ -12,24 +12,28 @@ export default function Dashboard({ onNavigate }: Props) {
   const [syncing, setSyncing]       = useState(false)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [error, setError]           = useState<string | null>(null)
-  const [retries, setRetries]       = useState(0)
+  const retriesRef                  = useRef(0)
 
+  // useRef para retries evita recrear loadStats en cada intento fallido
   const loadStats = useCallback(() => {
     getStats()
-      .then((data) => { setStats(data); setError(null) })
+      .then((data) => {
+        setStats(data)
+        setError(null)          // limpia error en cuanto el backend responde
+        retriesRef.current = 0  // resetea contador de reintentos
+      })
       .catch(() => {
-        setRetries((r) => r + 1)
-        // Solo mostrar error después de 3 intentos fallidos (da tiempo al backend de arrancar)
-        if (retries >= 3) {
+        retriesRef.current += 1
+        // Sólo mostrar error visual después de 4 intentos fallidos (~6 segundos)
+        if (retriesRef.current >= 4) {
           setError('No se pudo conectar al backend. Verifica que la app esté corriendo correctamente.')
         }
       })
-  }, [retries])
+  }, []) // sin dependencias — estable durante toda la vida del componente
 
   useEffect(() => {
-    // Primer intento con pequeño delay para dar tiempo al backend
     const initial = setTimeout(loadStats, 1500)
-    const id = setInterval(loadStats, 30000)
+    const id      = setInterval(loadStats, 30000)
     return () => { clearTimeout(initial); clearInterval(id) }
   }, [loadStats])
 
