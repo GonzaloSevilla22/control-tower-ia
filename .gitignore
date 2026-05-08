@@ -12,4 +12,3 @@ data/
 .env
 .DS_Store
 *.log
-resources/icon.ico
